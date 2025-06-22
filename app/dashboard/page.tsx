@@ -57,8 +57,8 @@ export default async function DashboardPage() {
                 <Button className="w-full" variant="outline">
                   Browse Profiles
                 </Button>
-                <Button className="w-full" variant="outline">
-                  My Profile
+                <Button className="w-full" variant="outline" asChild>
+                  <a href="/my-profile">My Profile</a>
                 </Button>
               </div>
             </CardContent>
@@ -103,7 +103,9 @@ export default async function DashboardPage() {
               Begin by completing your profile and browsing potential matches.
             </p>
             <div className="flex space-x-4">
-              <Button>Complete Profile</Button>
+              <Button asChild>
+                <a href="/my-profile">Complete Profile</a>
+              </Button>
               <Button variant="outline">Browse Profiles</Button>
             </div>
           </CardContent>

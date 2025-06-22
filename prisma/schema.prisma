@@ -20,6 +20,7 @@ model User {
   name              String?
   picture           String?   // Profile picture URL from Google
   emailVerified     Boolean   @default(false)
+  isVerified        Boolean   @default(false) // Admin verification status
   
   // Authentication tracking
   lastLoggedInAt    DateTime?
@@ -33,5 +34,108 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   
+  // Relations
+  profile           Profile?
+  fieldUpdates      FieldUpdate[]
+  
   @@map("users")
+}
+
+model Profile {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Status fields
+  isReady           Boolean   @default(false) // true when all sections are completed and admin has to verify
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Primary Details
+  profileCreatedFor String?
+  name              String?
+  about             String?   @db.Text
+  gender            String?
+  dateOfBirth       String?   // YYYY-MM-DD format
+  martialStatus     String?
+  education         String?
+  jobType           String?
+  jobTitle          String?
+  income            String?
+  height            String?
+  weight            String?
+  complexion        String?
+  mobileNumber      String?
+  currentAddress    Json?     // {street, city, state, pincode}
+  nativePlace       String?
+  motherTongue      String?
+  
+  // Family Details
+  fatherName        String?
+  fatherOccupation  String?
+  motherName        String?
+  motherOccupation  String?
+  familyType        String?
+  youngerBrothers   Int?
+  youngerSisters    Int?
+  elderBrothers     Int?
+  elderSisters      Int?
+  youngerBrothersMarried  Int?
+  youngerSistersMarried   Int?
+  elderBrothersMarried    Int?
+  elderSistersMarried     Int?
+  
+  // Spiritual Details
+  areYouSaved       String?
+  areYouBaptized    String?
+  areYouAnointed    String?
+  churchName        String?
+  denomination      String?
+  pastorName        String?
+  pastorMobileNumber String?
+  churchAddress     Json?     // {street, city, state, pincode}
+  
+  // Preferences
+  exMinAge          Int?
+  exMaxAge          Int?
+  exEducation       String?
+  exJobType         String?
+  exIncome          String?
+  exComplexion      String?
+  exOtherDetails    String?   @db.Text
+  
+  // Relations
+  images            ProfileImage[]
+  
+  @@map("profiles")
+}
+
+model ProfileImage {
+  id                String    @id @default(cuid())
+  profileId         String
+  profile           Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  data              String    @db.Text // Base64 encoded image data
+  isPrimary         Boolean   @default(false)
+  order             Int       @default(0)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@map("profile_images")
+}
+
+model FieldUpdate {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  fieldName         String    // Name of the field being updated
+  fieldValue        String    @db.Text // New value for the field
+  isApproved        Boolean   @default(false) // Admin approval status
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@map("field_updates")
 }

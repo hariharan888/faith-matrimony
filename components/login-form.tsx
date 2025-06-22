@@ -16,7 +16,8 @@ export function LoginForm({
   ...props
 }: React.ComponentProps<"div">) {
   const handleGoogleSignIn = () => {
-    signIn("google", { callbackUrl: "/dashboard" })
+    // Don't specify callbackUrl, let the middleware handle the redirect
+    signIn("google")
   }
 
   return (
