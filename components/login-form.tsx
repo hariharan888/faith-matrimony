@@ -1,3 +1,5 @@
+"use client"
+
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -7,11 +9,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { signIn } from "next-auth/react"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const handleGoogleSignIn = () => {
+    signIn("google", { callbackUrl: "/dashboard" })
+  }
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -23,7 +30,11 @@ export function LoginForm({
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-6">
-            <Button variant="outline" className="w-full">
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={handleGoogleSignIn}
+            >
               Login with Google
             </Button>
           </div>

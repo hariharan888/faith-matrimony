@@ -94,11 +94,11 @@ DATABASE_URL="postgresql://matrimony_user:your_password@localhost:5432/faith_mat
 # Environment
 NODE_ENV="development"
 
-# Google OAuth (add these when setting up authentication)
-# GOOGLE_CLIENT_ID="your_google_client_id"
-# GOOGLE_CLIENT_SECRET="your_google_client_secret"
-# NEXTAUTH_URL="http://localhost:3000"
-# NEXTAUTH_SECRET="your_nextauth_secret"
+# Google OAuth (required for authentication)
+GOOGLE_CLIENT_ID="your_google_client_id"
+GOOGLE_CLIENT_SECRET="your_google_client_secret"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="your_nextauth_secret_generate_a_random_string"
 ```
 
 ### 4. Run Database Migration
@@ -189,10 +189,44 @@ const user = await UserService.findByUid('google_uid_here')
 await UserService.updateUserLogin('google_uid_here')
 ```
 
+## Google OAuth Setup
+
+### 1. Create Google OAuth App
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the Google+ API
+4. Go to "Credentials" and create OAuth 2.0 Client IDs
+5. Set authorized redirect URIs:
+   - Development: `http://localhost:3000/api/auth/callback/google`
+   - Production: `https://yourdomain.com/api/auth/callback/google`
+
+### 2. Get OAuth Credentials
+
+1. Copy the Client ID and Client Secret
+2. Add them to your `.env` file
+3. Generate a random string for `NEXTAUTH_SECRET` (you can use: `openssl rand -base64 32`)
+
+### 3. Test Authentication
+
+```bash
+# Start your database
+npm run docker:up
+
+# Run migrations
+npm run db:migrate
+
+# Start the development server
+npm run dev
+```
+
+Visit `http://localhost:3000/login` and test Google login.
+
 ## Next Steps
 
 1. Set up your local PostgreSQL database
 2. Create and configure your `.env` file
 3. Run the initial migration
-4. Set up Google OAuth for authentication
-5. Configure Supabase for production deployment 
+4. Set up Google OAuth credentials
+5. Test the authentication flow
+6. Configure Supabase for production deployment 
