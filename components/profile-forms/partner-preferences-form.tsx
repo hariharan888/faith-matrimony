@@ -1,43 +1,75 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, Textarea } from '@/components/ui/select'
 import { profileSections, fieldSelectOptions } from '@/lib/profile-config'
+import { FormSubmissionHandler } from '@/types/my-profile'
 
 interface PartnerPreferencesFormProps {
-  initialData?: any
-  onSubmit: (data: any) => Promise<void>
+  initialData?: Record<string, unknown>
+  onSubmit: FormSubmissionHandler
   isSubmitting?: boolean
 }
 
 export function PartnerPreferencesForm({ initialData, onSubmit, isSubmitting = false }: PartnerPreferencesFormProps) {
+  // Function to sanitize initial data by converting null values to appropriate defaults
+  const sanitizeInitialData = useMemo(() => {
+    if (!initialData) return {}
+    
+    const sanitized: Record<string, unknown> = {}
+    
+    Object.entries(initialData).forEach(([key, value]) => {
+      if (value === null) {
+        sanitized[key] = '' // String fields default to empty string
+      } else {
+        sanitized[key] = value
+      }
+    })
+    
+    return sanitized
+  }, [initialData])
+
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset
   } = useForm({
-    resolver: yupResolver(profileSections.preferences.validationSchema),
-    defaultValues: initialData || {}
+    resolver: yupResolver(profileSections.preferences.validationSchema)
   })
 
+  // Update form when initialData changes
   useEffect(() => {
-    if (initialData) {
-      reset(initialData)
+    if (sanitizeInitialData && Object.keys(sanitizeInitialData).length > 0) {
+      reset(sanitizeInitialData)
     }
-  }, [initialData, reset])
+  }, [sanitizeInitialData, reset])
 
-  const onFormSubmit = async (data: any) => {
+  const onFormSubmit = async (data: Record<string, unknown>) => {
     try {
-      await onSubmit(data)
+      // Only send the preferences section fields
+      const preferencesFields = profileSections.preferences.fields
+      const filteredData: Record<string, unknown> = {}
+      preferencesFields.forEach(field => {
+        if (data[field] !== undefined) {
+          // Convert age fields to integers
+          if (field === 'exMinAge' || field === 'exMaxAge') {
+            filteredData[field] = parseInt(data[field] as string, 10)
+          } else {
+            filteredData[field] = data[field]
+          }
+        }
+      })
+      await onSubmit(filteredData)
     } catch (error) {
       console.error('Form submission error:', error)
+      // Error will be handled by the parent component with toast
+      throw error
     }
   }
 
@@ -55,13 +87,10 @@ export function PartnerPreferencesForm({ initialData, onSubmit, isSubmitting = f
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="exMinAge">Minimum Age *</Label>
-              <Input
-                id="exMinAge"
-                type="number"
-                min="18"
-                max="80"
-                {...register('exMinAge', { valueAsNumber: true })}
-                placeholder="Enter minimum age"
+              <Select
+                {...register('exMinAge')}
+                options={fieldSelectOptions.exMinAge}
+                placeholder="Select minimum age"
               />
               {errors.exMinAge?.message && (
                 <p className="text-sm text-red-600">{String(errors.exMinAge.message)}</p>
@@ -70,13 +99,10 @@ export function PartnerPreferencesForm({ initialData, onSubmit, isSubmitting = f
 
             <div className="space-y-2">
               <Label htmlFor="exMaxAge">Maximum Age *</Label>
-              <Input
-                id="exMaxAge"
-                type="number"
-                min="18"
-                max="80"
-                {...register('exMaxAge', { valueAsNumber: true })}
-                placeholder="Enter maximum age"
+              <Select
+                {...register('exMaxAge')}
+                options={fieldSelectOptions.exMaxAge}
+                placeholder="Select maximum age"
               />
               {errors.exMaxAge?.message && (
                 <p className="text-sm text-red-600">{String(errors.exMaxAge.message)}</p>
@@ -88,10 +114,10 @@ export function PartnerPreferencesForm({ initialData, onSubmit, isSubmitting = f
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="exEducation">Education Preference *</Label>
-              <Input
-                id="exEducation"
+              <Select
                 {...register('exEducation')}
-                placeholder="Enter education preference"
+                options={fieldSelectOptions.exEducation}
+                placeholder="Select education preference"
               />
               {errors.exEducation?.message && (
                 <p className="text-sm text-red-600">{String(errors.exEducation.message)}</p>

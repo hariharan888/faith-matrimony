@@ -11,6 +11,12 @@ interface ExtendedToken {
 export default withAuth(
   async function middleware(req) {
     const { pathname } = req.nextUrl
+    
+    // Skip page redirect logic for API routes - they handle authentication internally
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.next()
+    }
+    
     const token = await getToken({ req }) as ExtendedToken | null
 
     // Allow access to root and login pages for everyone
@@ -50,6 +56,11 @@ export default withAuth(
           return true
         }
         
+        // Allow API routes to handle their own authentication internally
+        if (req.nextUrl.pathname.startsWith("/api/")) {
+          return true
+        }
+        
         // Require authentication for all other pages
         return !!token
       },
@@ -61,12 +72,11 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api/auth (NextAuth API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder files
      */
-    "/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.).*)",
   ],
 } 

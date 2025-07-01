@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { Button } from '@/components/ui/button'
@@ -9,14 +9,56 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, Textarea } from '@/components/ui/select'
 import { profileSections, fieldSelectOptions } from '@/lib/profile-config'
+import { FormSubmissionHandler } from '@/types/my-profile'
 
 interface PrimaryDetailsFormProps {
-  initialData?: any
-  onSubmit: (data: any) => Promise<void>
+  initialData?: Record<string, unknown>
+  onSubmit: FormSubmissionHandler
   isSubmitting?: boolean
 }
 
 export function PrimaryDetailsForm({ initialData, onSubmit, isSubmitting = false }: PrimaryDetailsFormProps) {
+  // Function to sanitize initial data by converting null values to appropriate defaults
+  const sanitizeInitialData = useMemo(() => {
+    if (!initialData) return {}
+    
+    const sanitized: Record<string, unknown> = {}
+    const personalFields = profileSections.personal.fields
+    
+    Object.entries(initialData).forEach(([key, value]) => {
+      // Only include fields that belong to the personal section
+      if (personalFields.includes(key)) {
+        if (value === null) {
+          sanitized[key] = '' // String fields default to empty string
+        } else {
+          sanitized[key] = value
+        }
+      }
+    })
+    
+    return sanitized
+  }, [initialData])
+
+  // Utility function to format date for HTML date input
+  const formatDateForInput = (dateValue: unknown): string => {
+    if (!dateValue) return ''
+    
+    let date: Date
+    if (dateValue instanceof Date) {
+      date = dateValue
+    } else if (typeof dateValue === 'string') {
+      date = new Date(dateValue)
+    } else {
+      return ''
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) return ''
+    
+    // Format as YYYY-MM-DD for HTML date input
+    return date.toISOString().split('T')[0]
+  }
+
   const {
     register,
     handleSubmit,
@@ -24,20 +66,38 @@ export function PrimaryDetailsForm({ initialData, onSubmit, isSubmitting = false
     reset
   } = useForm({
     resolver: yupResolver(profileSections.personal.validationSchema),
-    defaultValues: initialData || {}
+    mode: 'onChange'
   })
 
+  // Update form when initialData changes
   useEffect(() => {
-    if (initialData) {
-      reset(initialData)
+    if (sanitizeInitialData && Object.keys(sanitizeInitialData).length > 0) {
+      const formData = {
+        ...sanitizeInitialData,
+        dateOfBirth: formatDateForInput(sanitizeInitialData.dateOfBirth)
+      }
+      
+      reset(formData)
     }
-  }, [initialData, reset])
+  }, [sanitizeInitialData, reset])
 
-  const onFormSubmit = async (data: any) => {
+  const onFormSubmit = async (data: Record<string, unknown>) => {
     try {
-      await onSubmit(data)
+      // Only send the personal section fields
+      const personalFields = profileSections.personal.fields
+      const filteredData: Record<string, unknown> = {}
+      
+      personalFields.forEach(field => {
+        if (data[field] !== undefined) {
+          filteredData[field] = data[field]
+        }
+      })
+      
+      await onSubmit(filteredData)
     } catch (error) {
       console.error('Form submission error:', error)
+      // Error will be handled by the parent component with toast
+      throw error
     }
   }
 

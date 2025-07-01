@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -12,10 +13,10 @@ import { PartnerPreferencesForm } from './profile-forms/partner-preferences-form
 import { PhotosForm } from './profile-forms/photos-form'
 
 interface ProfileFormContainerProps {
-  initialData?: any
+  initialData?: Record<string, unknown> | null
   completionPercentage: number
   isNewProfile: boolean
-  onSectionSubmit: (section: ProfileSectionKey, data: any) => Promise<void>
+  onSectionSubmit: (section: ProfileSectionKey, data: Record<string, unknown>) => Promise<void>
   onNavigateBack?: () => void
 }
 
@@ -38,7 +39,7 @@ export function ProfileFormContainer({
       PROFILE_SECTIONS_ORDER.forEach(section => {
         const sectionFields = profileSections[section].fields
         const isComplete = sectionFields.every((field: string) => {
-          const value = (initialData as any)[field]
+          const value = initialData[field]
           return value !== null && value !== undefined && value !== ''
         })
         completed[section] = isComplete
@@ -47,14 +48,19 @@ export function ProfileFormContainer({
     }
   }, [initialData])
 
-  const handleSectionSubmit = async (section: ProfileSectionKey, data: any) => {
+  const handleSectionSubmit = async (section: ProfileSectionKey, data: Record<string, unknown>) => {
     setSubmittingSection(section)
     try {
+      console.log('Submitting section:', section)
       await onSectionSubmit(section, data)
       setSectionCompleted(prev => ({ ...prev, [section]: true }))
       setHasUnsavedChanges(false)
       
-      // In new profile mode, automatically move to next incomplete section
+      // Show success toast
+      console.log('Showing success toast for:', section)
+      toast.success(`${profileSections[section].title} saved successfully!`)
+      
+      // Only move to next section if submission was successful
       if (isNewProfile) {
         const currentIndex = PROFILE_SECTIONS_ORDER.indexOf(section)
         const nextSection = PROFILE_SECTIONS_ORDER[currentIndex + 1]
@@ -64,6 +70,12 @@ export function ProfileFormContainer({
       }
     } catch (error) {
       console.error('Section submission error:', error)
+      // Show error toast
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save section'
+      console.log('Showing error toast for:', section)
+      toast.error(`Failed to save ${profileSections[section].title}: ${errorMessage}`)
+      // Don't update section completion or move to next section on error
+      // The error will be handled by the form component
     } finally {
       setSubmittingSection(null)
     }
@@ -94,9 +106,9 @@ export function ProfileFormContainer({
 
   const renderCurrentForm = () => {
     const commonProps = {
-      initialData,
+      initialData: initialData || undefined,
       isSubmitting: submittingSection === currentSection,
-      onSubmit: (data: any) => handleSectionSubmit(currentSection, data)
+      onSubmit: (data: Record<string, unknown>) => handleSectionSubmit(currentSection, data)
     }
 
     switch (currentSection) {
@@ -133,11 +145,23 @@ export function ProfileFormContainer({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-                {!isNewProfile && onNavigateBack && (
-                  <Button variant="outline" size="sm" onClick={onNavigateBack}>
-                    Back to Dashboard
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      console.log('Test toast clicked')
+                      toast.success('Test success toast!')
+                    }}
+                  >
+                    Test Toast
                   </Button>
-                )}
+                  {!isNewProfile && onNavigateBack && (
+                    <Button variant="outline" size="sm" onClick={onNavigateBack}>
+                      Back to Dashboard
+                    </Button>
+                  )}
+                </div>
               </div>
               
               {isNewProfile && (
@@ -180,11 +204,11 @@ export function ProfileFormContainer({
                         className={`
                           w-full text-left px-3 py-2 rounded-md text-sm transition-colors
                           ${isActive 
-                            ? 'bg-blue-100 text-blue-900 border border-blue-300' 
+                            ? 'bg-blue-100 text-blue-900 border border-blue-300 cursor-pointer' 
                             : isComplete 
-                              ? 'bg-green-50 text-green-800 hover:bg-green-100' 
+                              ? 'bg-green-50 text-green-800 hover:bg-green-100 cursor-pointer' 
                               : canNavigate 
-                                ? 'text-gray-700 hover:bg-gray-100' 
+                                ? 'text-gray-700 hover:bg-gray-100 cursor-pointer' 
                                 : 'text-gray-400 cursor-not-allowed'
                           }
                         `}

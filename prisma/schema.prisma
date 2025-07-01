@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,128 +8,90 @@ datasource db {
 }
 
 model User {
-  id                String    @id @default(cuid())
-  uid               String    @unique // Google UID or other OAuth provider UID
-  email             String    @unique
-  name              String?
-  picture           String?   // Profile picture URL from Google
-  emailVerified     Boolean   @default(false)
-  isVerified        Boolean   @default(false) // Admin verification status
-  
-  // Authentication tracking
-  lastLoggedInAt    DateTime?
-  loginCount        Int       @default(0)
-  
-  // Account management
-  isActive          Boolean   @default(true)
-  isBlocked         Boolean   @default(false)
-  
-  // Timestamps
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  // Relations
-  profile           Profile?
-  fieldUpdates      FieldUpdate[]
-  
+  id             String    @id @default(cuid())
+  uid            String    @unique
+  email          String    @unique
+  name           String?
+  picture        String?
+  emailVerified  Boolean   @default(false)
+  lastLoggedInAt DateTime?
+  loginCount     Int       @default(0)
+  isActive       Boolean   @default(true)
+  isBlocked      Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  isVerified     Boolean   @default(false)
+  profile        Profile?
+
   @@map("users")
 }
 
 model Profile {
-  id                String    @id @default(cuid())
-  userId            String    @unique
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Status fields
-  isReady           Boolean   @default(false) // true when all sections are completed and admin has to verify
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  // Primary Details
-  profileCreatedFor String?
-  name              String?
-  about             String?   @db.Text
-  gender            String?
-  dateOfBirth       String?   // YYYY-MM-DD format
-  martialStatus     String?
-  education         String?
-  jobType           String?
-  jobTitle          String?
-  income            String?
-  height            String?
-  weight            String?
-  complexion        String?
-  mobileNumber      String?
-  currentAddress    Json?     // {street, city, state, pincode}
-  nativePlace       String?
-  motherTongue      String?
-  
-  // Family Details
-  fatherName        String?
-  fatherOccupation  String?
-  motherName        String?
-  motherOccupation  String?
-  familyType        String?
-  youngerBrothers   Int?
-  youngerSisters    Int?
-  elderBrothers     Int?
-  elderSisters      Int?
-  youngerBrothersMarried  Int?
-  youngerSistersMarried   Int?
-  elderBrothersMarried    Int?
-  elderSistersMarried     Int?
-  
-  // Spiritual Details
-  areYouSaved       String?
-  areYouBaptized    String?
-  areYouAnointed    String?
-  churchName        String?
-  denomination      String?
-  pastorName        String?
-  pastorMobileNumber String?
-  churchAddress     Json?     // {street, city, state, pincode}
-  
-  // Preferences
-  exMinAge          Int?
-  exMaxAge          Int?
-  exEducation       String?
-  exJobType         String?
-  exIncome          String?
-  exComplexion      String?
-  exOtherDetails    String?   @db.Text
-  
-  // Relations
-  images            ProfileImage[]
-  
+  id                     String         @id @default(cuid())
+  userId                 String         @unique
+  isReady                Boolean        @default(false)
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  name                   String?
+  about                  String?
+  gender                 String?
+  dateOfBirth            String?
+  martialStatus          String?
+  education              String?
+  jobType                String?
+  jobTitle               String?
+  income                 String?
+  height                 String?
+  weight                 String?
+  complexion             String?
+  mobileNumber           String?
+  currentAddress         Json?
+  nativePlace            String?
+  motherTongue           String?
+  fatherName             String?
+  fatherOccupation       String?
+  motherName             String?
+  motherOccupation       String?
+  familyType             String?
+  youngerBrothers        Int?
+  youngerSisters         Int?
+  elderBrothers          Int?
+  elderSisters           Int?
+  youngerBrothersMarried Int?
+  youngerSistersMarried  Int?
+  elderBrothersMarried   Int?
+  elderSistersMarried    Int?
+  areYouSaved            String?
+  areYouBaptized         String?
+  areYouAnointed         String?
+  churchName             String?
+  denomination           String?
+  pastorName             String?
+  pastorMobileNumber     String?
+  churchAddress          Json?
+  exMinAge               Int?
+  exMaxAge               Int?
+  exEducation            String?
+  exJobType              String?
+  exIncome               String?
+  exComplexion           String?
+  exOtherDetails         String?
+  profileCreatedFor      String?
+  images                 ProfileImage[]
+  user                   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("profiles")
 }
 
 model ProfileImage {
-  id                String    @id @default(cuid())
-  profileId         String
-  profile           Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  
-  data              String    @db.Text // Base64 encoded image data
-  isPrimary         Boolean   @default(false)
-  order             Int       @default(0)
-  
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  @@map("profile_images")
-}
+  id        String   @id @default(cuid())
+  profileId String
+  data      String
+  isPrimary Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-model FieldUpdate {
-  id                String    @id @default(cuid())
-  userId            String
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  fieldName         String    // Name of the field being updated
-  fieldValue        String    @db.Text // New value for the field
-  isApproved        Boolean   @default(false) // Admin approval status
-  
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  @@map("field_updates")
+  @@map("profile_images")
 }

@@ -6,110 +6,125 @@ import { UserService } from '@/lib/services/user'
 import { profileSections, ProfileSectionKey } from '@/lib/profile-config'
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     section: string
-  }
+  }>
+}
+
+// Ensure all responses are JSON
+function jsonResponse(data: Record<string, unknown>, status = 200) {
+  return NextResponse.json(data, { 
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
 }
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
+    const { section } = await params
     const session = await getServerSession(authOptions)
     
     if (!session?.user?.uid) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return jsonResponse({ error: 'Unauthorized' }, 401)
     }
 
     const user = await UserService.findByUid(session.user.uid)
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return jsonResponse({ error: 'User not found' }, 404)
     }
 
-    const section = params.section as ProfileSectionKey
+    const sectionKey = section as ProfileSectionKey
     
-    if (!profileSections[section]) {
-      return NextResponse.json({ error: 'Invalid section' }, { status: 400 })
+    if (!profileSections[sectionKey]) {
+      return jsonResponse({ error: 'Invalid section' }, 400)
     }
 
     const body = await request.json()
     
     // Validate the data against the section schema
     try {
-      await profileSections[section].validationSchema.validate(body, { abortEarly: false })
-    } catch (validationError: any) {
-      return NextResponse.json({ 
+      await profileSections[sectionKey].validationSchema.validate(body, { abortEarly: false })
+    } catch (validationError: unknown) {
+      const error = validationError as { errors?: string[] }
+      return jsonResponse({ 
         error: 'Validation failed', 
-        details: validationError.errors 
-      }, { status: 400 })
+        details: error.errors || [] 
+      }, 400)
     }
 
     // Ensure profile exists
-    let profile = await ProfileService.getProfileByUserId(user.id)
+    const profile = await ProfileService.getProfileByUserId(user.id)
     if (!profile) {
-      profile = await ProfileService.createProfile({ userId: user.id })
+      await ProfileService.createProfile({ userId: user.id })
     }
 
     // Update the profile section
-    await ProfileService.updateProfileSection(user.id, section, body)
+    await ProfileService.updateProfileSection(user.id, sectionKey, body)
     
     // Get updated profile data
-    const updatedProfile = await ProfileService.getProfileByUserId(user.id, true)
+    const updatedProfile = await ProfileService.getProfileByUserId(user.id)
     const completionPercentage = await ProfileService.getProfileCompletionPercentage(user.id)
     const nextSection = await ProfileService.getNextIncompleteSection(user.id)
     
-    return NextResponse.json({
+    return jsonResponse({
       profile: updatedProfile,
       completionPercentage,
       nextSection,
       success: true
     })
   } catch (error) {
-    console.error(`Profile ${params.section} PUT error:`, error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const { section } = await params
+    console.error(`Profile ${section} PUT error:`, error)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    const { section } = await params
     const session = await getServerSession(authOptions)
     
     if (!session?.user?.uid) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return jsonResponse({ error: 'Unauthorized' }, 401)
     }
 
     const user = await UserService.findByUid(session.user.uid)
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return jsonResponse({ error: 'User not found' }, 404)
     }
 
-    const section = params.section as ProfileSectionKey
+    const sectionKey = section as ProfileSectionKey
     
-    if (!profileSections[section]) {
-      return NextResponse.json({ error: 'Invalid section' }, { status: 400 })
+    if (!profileSections[sectionKey]) {
+      return jsonResponse({ error: 'Invalid section' }, 400)
     }
 
-    const profile = await ProfileService.getProfileByUserId(user.id, true)
+    const profile = await ProfileService.getProfileByUserId(user.id)
     
     if (!profile) {
-      return NextResponse.json({ 
+      return jsonResponse({ 
         sectionData: {},
         isEmpty: true
       })
     }
 
     // Extract section-specific data from the profile
-    const sectionFields = profileSections[section].fields
-    const sectionData: any = {}
+    const sectionFields = profileSections[sectionKey].fields
+    const sectionData: Record<string, unknown> = {}
     
     sectionFields.forEach(field => {
-      sectionData[field] = (profile as any)[field]
+      sectionData[field] = (profile as Record<string, unknown>)[field]
     })
 
-    return NextResponse.json({
+    return jsonResponse({
       sectionData,
       isEmpty: false
     })
   } catch (error) {
-    console.error(`Profile ${params.section} GET error:`, error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const { section } = await params
+    console.error(`Profile ${section} GET error:`, error)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 } 

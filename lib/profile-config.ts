@@ -1,4 +1,48 @@
 import * as Yup from 'yup'
+import _ from 'lodash'
+
+export type ProfileSectionKey = 'personal' | 'family' | 'spiritual' | 'preferences' | 'images' | 'payment'
+
+// Helper arrays for dynamic options
+const jobTypeOptions = [
+  'Student',
+  'Software Engineer',
+  'Doctor',
+  'Teacher',
+  'Business Owner',
+  'Government Employee',
+  'Private Employee',
+  'Farmer',
+  'Homemaker',
+  'Retired',
+  'Unemployed',
+  'Other',
+]
+
+const heightOptions = []
+for (let feet = 4; feet <= 7; feet++) {
+  for (let inches = 0; inches <= 11; inches++) {
+    const totalInches = feet * 12 + inches
+    if (totalInches >= 48 && totalInches <= 84) { // 4'0" to 7'0"
+      heightOptions.push(`${feet}'${inches}"`)
+    }
+  }
+}
+
+const weightOptions = []
+for (let weight = 40; weight <= 120; weight += 5) {
+  weightOptions.push(`${weight} kg`)
+}
+weightOptions.push('Above 120 kg')
+
+const complexionOptions = [
+  'Very Fair',
+  'Fair',
+  'Wheatish',
+  'Medium',
+  'Dark',
+  'Very Dark',
+]
 
 const incomeOptions = [
   'Below 1L',
@@ -13,128 +57,37 @@ const incomeOptions = [
   'Above 30L',
 ]
 
-const heightOptions = [
-  'Below 4ft',
-  '4ft 1in',
-  '4ft 2in',
-  '4ft 3in',
-  '4ft 4in',
-  '4ft 5in',
-  '4ft 6in',
-  '4ft 7in',
-  '4ft 8in',
-  '4ft 9in',
-  '4ft 10in',
-  '4ft 11in',
-  '5ft',
-  '5ft 1in',
-  '5ft 2in',
-  '5ft 3in',
-  '5ft 4in',
-  '5ft 5in',
-  '5ft 6in',
-  '5ft 7in',
-  '5ft 8in',
-  '5ft 9in',
-  '5ft 10in',
-  '5ft 11in',
-  '6ft',
-  '6ft 1in',
-  '6ft 2in',
-  '6ft 3in',
-  '6ft 4in',
-  '6ft 5in',
-  '6ft 6in',
-  '6ft 7in',
-  '6ft 8in',
-  '6ft 9in',
-  '6ft 10in',
-  '6ft 11in',
-  '7ft',
-  'Above 7ft',
-]
+// Age options for preferences
+const ageOptions = []
+for (let age = 18; age <= 60; age++) {
+  ageOptions.push(age.toString())
+}
 
-const complexionOptions = ['Fair', 'Wheatish', 'Wheatish-Fair', 'Wheatish-Dark', 'Dark', 'Other']
-
-const educationOptions = [
-  'No Education',
-  'Primary School',
-  'High School',
-  'Higher Secondary',
-  'Diploma',
-  'Under Graduate',
-  'Post Graduate',
-  'Ph.D.',
-  'Other'
-]
-
-const weightOptions = [
-  'Less than 40kg',
-  '40-45kg',
-  '45-50kg',
-  '50-55kg',
-  '55-60kg',
-  '60-65kg',
-  '65-70kg',
-  '70-75kg',
-  '75-80kg',
-  '80-85kg',
-  '85-90kg',
-  '90-95kg',
-  '95-100kg',
-  '100-110kg',
-  '110-120kg',
-  'Above 120kg'
-]
-
-const jobTypeOptions = [
-  'Self Employed',
-  'Government Service',
-  'Private Service',
-  'Business',
-  'Student',
-  'Home Maker',
-  'Other',
-]
-
+// State options
 const stateOptions = [
-  'Andhra Pradesh',
-  'Arunachal Pradesh',
-  'Assam',
-  'Bihar',
-  'Chhattisgarh',
-  'Goa',
-  'Gujarat',
-  'Haryana',
-  'Himachal Pradesh',
-  'Jammu and Kashmir',
-  'Jharkhand',
-  'Karnataka',
-  'Kerala',
-  'Madhya Pradesh',
-  'Maharashtra',
-  'Manipur',
-  'Meghalaya',
-  'Mizoram',
-  'Nagaland',
-  'Odisha',
-  'Punjab',
-  'Rajasthan',
-  'Sikkim',
-  'Tamil Nadu',
-  'Telangana',
-  'Tripura',
-  'Uttar Pradesh',
-  'Uttarakhand',
-  'West Bengal',
-  'Other',
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana',
+  'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Delhi', 'Puducherry',
+  'Chandigarh', 'Andaman and Nicobar Islands', 'Dadra and Nagar Haveli and Daman and Diu',
+  'Lakshadweep', 'Ladakh', 'Jammu and Kashmir'
 ]
+
+export const PROFILE_SECTIONS_ORDER: ProfileSectionKey[] = ['personal', 'family', 'spiritual', 'preferences', 'images', 'payment']
 
 export const fieldSelectOptions: Record<string, string[]> = {
+  profileCreatedFor: ['Self', 'Son', 'Daughter', 'Brother', 'Sister', 'Relative', 'Friend', 'Other'],
   gender: ['Male', 'Female', 'Other'],
-  profileCreatedFor: ['Sister', 'Brother', 'Son', 'Daughter', 'Relative', 'Friend', 'Other'],
   martialStatus: ['Single', 'Married', 'Divorced', 'Widowed', 'Annulled', 'Other'],
-  education: educationOptions,
+  education: [
+    'High School',
+    'Diploma',
+    'Bachelor\'s Degree',
+    'Master\'s Degree',
+    'PhD',
+    'Professional Degree',
+    'Other',
+  ],
   jobType: jobTypeOptions,
   income: incomeOptions,
   height: heightOptions,
@@ -153,13 +106,16 @@ export const fieldSelectOptions: Record<string, string[]> = {
     'Urdu',
     'Other',
   ],
-  fatherOccupation: jobTypeOptions.filter(job => job !== 'Student'),
-  motherOccupation: jobTypeOptions.filter(job => job !== 'Student'),
+  fatherOccupation: [..._.without(jobTypeOptions, 'Student')],
+  motherOccupation: [..._.without(jobTypeOptions, 'Student')],
   familyType: ['Nuclear', 'Joint', 'Extended', 'Other'],
   areYouSaved: ['Yes', 'No'],
   areYouBaptized: ['Yes', 'No'],
   areYouAnointed: ['Yes', 'No'],
   denomination: ['Pentecostal', 'Catholic', 'Protestant', 'Orthodox', 'Other'],
+  exMinAge: ageOptions,
+  exMaxAge: ageOptions,
+  exEducation: ['Any', 'High School', 'Diploma', 'Bachelor\'s Degree', 'Master\'s Degree', 'PhD', 'Professional Degree', 'Other'],
   exJobType: ['Any', ...jobTypeOptions],
   exIncome: ['Any', ...incomeOptions],
   exComplexion: ['Any', ...complexionOptions],
@@ -184,7 +140,6 @@ export const profileSections = {
       'weight',
       'complexion',
       'mobileNumber',
-      'currentAddress',
       'nativePlace',
       'motherTongue',
     ],
@@ -197,7 +152,9 @@ export const profileSections = {
       gender: Yup.string()
         .oneOf(fieldSelectOptions.gender, 'Invalid gender')
         .required('Gender is required'),
-      dateOfBirth: Yup.date().required('Date of Birth is required'),
+      dateOfBirth: Yup.string()
+        .required('Date of Birth is required')
+        .matches(/^\d{4}-\d{2}-\d{2}$/, 'Please enter a valid date'),
       martialStatus: Yup.string()
         .oneOf(fieldSelectOptions.martialStatus, 'Invalid martial status')
         .required('Martial Status is required'),
@@ -220,14 +177,6 @@ export const profileSections = {
       complexion: Yup.string()
         .oneOf(fieldSelectOptions.complexion, 'Invalid complexion')
         .required('Complexion is required'),
-      currentAddress: Yup.object().shape({
-        street: Yup.string().required('Street is required'),
-        city: Yup.string().required('City is required'),
-        state: Yup.string()
-          .oneOf(fieldSelectOptions.state, 'Invalid state')
-          .required('State is required'),
-        pincode: Yup.string().required('Pincode is required'),
-      }),
       mobileNumber: Yup.string().required('Mobile Number is required'),
       nativePlace: Yup.string().required('Native Place is required'),
       motherTongue: Yup.string()
@@ -243,6 +192,7 @@ export const profileSections = {
       'motherName',
       'motherOccupation',
       'familyType',
+      'currentAddress',
       'youngerBrothers',
       'youngerSisters',
       'elderBrothers',
@@ -254,24 +204,52 @@ export const profileSections = {
     ],
     validationSchema: Yup.object().shape({
       fatherName: Yup.string().required("Father's Name is required"),
-      fatherOccupation: Yup.string()
-        .oneOf(fieldSelectOptions.fatherOccupation, 'Invalid father occupation')
-        .required("Father's Occupation is required"),
+      fatherOccupation: Yup.string().required("Father's Occupation is required"),
       motherName: Yup.string().required("Mother's Name is required"),
-      motherOccupation: Yup.string()
-        .oneOf(fieldSelectOptions.motherOccupation, 'Invalid mother occupation')
-        .required("Mother's Occupation is required"),
+      motherOccupation: Yup.string().required("Mother's Occupation is required"),
       familyType: Yup.string()
         .oneOf(fieldSelectOptions.familyType, 'Invalid family type')
         .required('Family Type is required'),
+      currentAddress: Yup.object().shape({
+        street: Yup.string().required('Street is required'),
+        city: Yup.string().required('City is required'),
+        state: Yup.string()
+          .oneOf(fieldSelectOptions.state, 'Invalid state')
+          .required('State is required'),
+        pincode: Yup.string().required('Pincode is required'),
+      }),
       youngerBrothers: Yup.number().min(0).required('Required'),
       youngerSisters: Yup.number().min(0).required('Required'),
       elderBrothers: Yup.number().min(0).required('Required'),
       elderSisters: Yup.number().min(0).required('Required'),
-      youngerBrothersMarried: Yup.number().min(0).required('Required'),
-      youngerSistersMarried: Yup.number().min(0).required('Required'),
-      elderBrothersMarried: Yup.number().min(0).required('Required'),
-      elderSistersMarried: Yup.number().min(0).required('Required'),
+      youngerBrothersMarried: Yup.number()
+        .min(0)
+        .required('Required')
+        .test('younger-brothers-married', 'Married count cannot exceed total count', function(value) {
+          const { youngerBrothers } = this.parent
+          return !value || !youngerBrothers || value <= youngerBrothers
+        }),
+      youngerSistersMarried: Yup.number()
+        .min(0)
+        .required('Required')
+        .test('younger-sisters-married', 'Married count cannot exceed total count', function(value) {
+          const { youngerSisters } = this.parent
+          return !value || !youngerSisters || value <= youngerSisters
+        }),
+      elderBrothersMarried: Yup.number()
+        .min(0)
+        .required('Required')
+        .test('elder-brothers-married', 'Married count cannot exceed total count', function(value) {
+          const { elderBrothers } = this.parent
+          return !value || !elderBrothers || value <= elderBrothers
+        }),
+      elderSistersMarried: Yup.number()
+        .min(0)
+        .required('Required')
+        .test('elder-sisters-married', 'Married count cannot exceed total count', function(value) {
+          const { elderSisters } = this.parent
+          return !value || !elderSisters || value <= elderSisters
+        }),
     }),
   },
   spiritual: {
@@ -322,9 +300,15 @@ export const profileSections = {
       'exOtherDetails',
     ],
     validationSchema: Yup.object().shape({
-      exMinAge: Yup.number().min(18).required('Minimum Age is required'),
-      exMaxAge: Yup.number().min(18).required('Maximum Age is required'),
-      exEducation: Yup.string().required('Education is required'),
+      exMinAge: Yup.string()
+        .oneOf(fieldSelectOptions.exMinAge, 'Invalid minimum age')
+        .required('Minimum Age is required'),
+      exMaxAge: Yup.string()
+        .oneOf(fieldSelectOptions.exMaxAge, 'Invalid maximum age')
+        .required('Maximum Age is required'),
+      exEducation: Yup.string()
+        .oneOf(fieldSelectOptions.exEducation, 'Invalid education')
+        .required('Education is required'),
       exJobType: Yup.string()
         .oneOf(fieldSelectOptions.exJobType, 'Invalid job type')
         .required('Job Type is required'),
@@ -353,7 +337,7 @@ export const profileSections = {
         )
         .min(1, 'At least one photo is required')
         .required('Gallery is required'),
-      profilePictureIndex: Yup.number(),
+      profilePictureIndex: Yup.number().min(0),
     }),
   },
   payment: {
@@ -363,17 +347,4 @@ export const profileSections = {
   },
 }
 
-export const PROFILE_SECTIONS_ORDER = ['personal', 'family', 'spiritual', 'preferences', 'images', 'payment'] as const
-export type ProfileSectionKey = typeof PROFILE_SECTIONS_ORDER[number]
-
-// Text fields that require admin verification when updated
-export const TEXT_FIELDS_REQUIRING_VERIFICATION = [
-  'name',
-  'about',
-  'jobTitle',
-  'fatherName',
-  'motherName',
-  'churchName',
-  'pastorName',
-  'exOtherDetails'
-] 
+ 

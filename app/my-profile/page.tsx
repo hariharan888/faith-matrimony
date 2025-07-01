@@ -4,13 +4,8 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { ProfileSectionKey } from '@/lib/profile-config'
-import { ProfileFormContainer } from '@/components/profile-form-container'
-
-interface ProfileData {
-  profile: any
-  completionPercentage: number
-  nextSection: ProfileSectionKey | null
-}
+import { MyProfileFormProvider, ProfileData } from '@/components/providers/my-profile-form-provider'
+import { ProfileFormLayout } from '@/components/my-profile/profile-form-layout'
 
 export default function MyProfilePage() {
   const { data: session, status } = useSession()
@@ -54,7 +49,7 @@ export default function MyProfilePage() {
     }
   }
 
-  const handleSectionSubmit = async (section: ProfileSectionKey, data: any) => {
+  const handleSectionSubmit = async (section: ProfileSectionKey, data: Record<string, unknown>) => {
     try {
       const response = await fetch(`/api/profile/${section}`, {
         method: 'PUT',
@@ -62,19 +57,26 @@ export default function MyProfilePage() {
         body: JSON.stringify(data),
       })
 
-      if (response.ok) {
-        const result = await response.json()
-        setProfileData(result)
-        
-        // If profile completion reaches 100%, exit new profile mode
-        if (result.completionPercentage >= 100) {
-          setIsNewProfile(false)
-        }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      setProfileData(result)
+      
+      // If profile completion reaches 100%, exit new profile mode
+      if (result.completionPercentage >= 100) {
+        setIsNewProfile(false)
       }
     } catch (error) {
       console.error('Error updating profile section:', error)
-      throw error
+      throw error // Re-throw the error so the form container can handle it
     }
+  }
+
+  const handleNavigateBack = () => {
+    router.push('/dashboard')
   }
 
   if (loading) {
@@ -99,12 +101,13 @@ export default function MyProfilePage() {
   }
 
   return (
-    <ProfileFormContainer
-      initialData={profileData.profile}
-      completionPercentage={profileData.completionPercentage}
+    <MyProfileFormProvider
+      initialData={profileData}
       isNewProfile={isNewProfile}
       onSectionSubmit={handleSectionSubmit}
-      onNavigateBack={() => router.push('/dashboard')}
-    />
+      onNavigateBack={handleNavigateBack}
+    >
+      <ProfileFormLayout />
+    </MyProfileFormProvider>
   )
 } 

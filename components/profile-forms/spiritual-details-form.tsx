@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { Button } from '@/components/ui/button'
@@ -9,52 +9,103 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { profileSections, fieldSelectOptions } from '@/lib/profile-config'
+import { AddressData, FormSubmissionHandler } from '@/types/my-profile'
 
 interface SpiritualDetailsFormProps {
-  initialData?: any
-  onSubmit: (data: any) => Promise<void>
+  initialData?: Record<string, unknown>
+  onSubmit: FormSubmissionHandler
   isSubmitting?: boolean
 }
 
 export function SpiritualDetailsForm({ initialData, onSubmit, isSubmitting = false }: SpiritualDetailsFormProps) {
-  const [churchAddress, setChurchAddress] = useState({
-    street: '',
-    city: '',
-    state: '',
-    pincode: ''
-  })
+  // Function to sanitize initial data by converting null values to appropriate defaults
+  const sanitizeInitialData = useMemo(() => {
+    if (!initialData) return {}
+    
+    const sanitized: Record<string, unknown> = {}
+    
+    Object.entries(initialData).forEach(([key, value]) => {
+      if (value === null) {
+        sanitized[key] = '' // String fields default to empty string
+      } else {
+        sanitized[key] = value
+      }
+    })
+    
+    return sanitized
+  }, [initialData])
+
+  // Initialize churchAddress from initialData or empty
+  const initialAddress = useMemo((): AddressData => {
+    if (sanitizeInitialData?.churchAddress && typeof sanitizeInitialData.churchAddress === 'object') {
+      const addr = sanitizeInitialData.churchAddress as AddressData
+      return {
+        street: addr.street || '',
+        city: addr.city || '',
+        state: addr.state || '',
+        pincode: addr.pincode || ''
+      }
+    }
+    return {
+      street: '',
+      city: '',
+      state: '',
+      pincode: ''
+    }
+  }, [sanitizeInitialData])
+
+  const [churchAddress, setChurchAddress] = useState<AddressData>(initialAddress)
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-    setValue,
-    reset
+    reset,
+    setValue
   } = useForm({
-    resolver: yupResolver(profileSections.spiritual.validationSchema),
-    defaultValues: initialData || {}
+    resolver: yupResolver(profileSections.spiritual.validationSchema)
   })
 
+  // Update form when initialData changes
   useEffect(() => {
-    if (initialData) {
-      reset(initialData)
-      if (initialData.churchAddress) {
-        setChurchAddress(initialData.churchAddress)
+    if (sanitizeInitialData && Object.keys(sanitizeInitialData).length > 0) {
+      const newAddress = initialAddress
+      setChurchAddress(newAddress)
+      
+      const formData = {
+        ...sanitizeInitialData,
+        churchAddress: newAddress
       }
+      
+      reset(formData)
     }
-  }, [initialData, reset])
+  }, [sanitizeInitialData, initialAddress, reset])
 
-  const handleAddressChange = (field: string, value: string) => {
+  const handleAddressChange = (field: keyof AddressData, value: string) => {
     const newAddress = { ...churchAddress, [field]: value }
     setChurchAddress(newAddress)
-    setValue('churchAddress', newAddress)
+    
+    // Update the form value for validation
+    setValue('churchAddress', newAddress, { shouldValidate: true })
   }
 
-  const onFormSubmit = async (data: any) => {
+  const onFormSubmit = async (data: Record<string, unknown>) => {
     try {
-      await onSubmit({ ...data, churchAddress })
+      // Only send the spiritual section fields
+      const spiritualFields = profileSections.spiritual.fields
+      const filteredData: Record<string, unknown> = {}
+      spiritualFields.forEach(field => {
+        if (field === 'churchAddress') {
+          filteredData[field] = churchAddress
+        } else if (data[field] !== undefined) {
+          filteredData[field] = data[field]
+        }
+      })
+      await onSubmit(filteredData)
     } catch (error) {
       console.error('Form submission error:', error)
+      // Error will be handled by the parent component with toast
+      throw error
     }
   }
 
@@ -63,7 +114,7 @@ export function SpiritualDetailsForm({ initialData, onSubmit, isSubmitting = fal
       <CardHeader>
         <CardTitle>Spiritual Details</CardTitle>
         <CardDescription>
-          Tell us about your spiritual journey and church background
+          Information about your spiritual background and church details
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -71,11 +122,11 @@ export function SpiritualDetailsForm({ initialData, onSubmit, isSubmitting = fal
           {/* Spiritual Status - 3 columns */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="areYouSaved">Are You Saved? *</Label>
+              <Label htmlFor="areYouSaved">Are you Saved? *</Label>
               <Select
                 {...register('areYouSaved')}
                 options={fieldSelectOptions.areYouSaved}
-                placeholder="Select"
+                placeholder="Select yes or no"
               />
               {errors.areYouSaved?.message && (
                 <p className="text-sm text-red-600">{String(errors.areYouSaved.message)}</p>
@@ -83,11 +134,11 @@ export function SpiritualDetailsForm({ initialData, onSubmit, isSubmitting = fal
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="areYouBaptized">Are You Baptized? *</Label>
+              <Label htmlFor="areYouBaptized">Are you Baptized? *</Label>
               <Select
                 {...register('areYouBaptized')}
                 options={fieldSelectOptions.areYouBaptized}
-                placeholder="Select"
+                placeholder="Select yes or no"
               />
               {errors.areYouBaptized?.message && (
                 <p className="text-sm text-red-600">{String(errors.areYouBaptized.message)}</p>
@@ -95,11 +146,11 @@ export function SpiritualDetailsForm({ initialData, onSubmit, isSubmitting = fal
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="areYouAnointed">Are You Anointed? *</Label>
+              <Label htmlFor="areYouAnointed">Are you Anointed? *</Label>
               <Select
                 {...register('areYouAnointed')}
                 options={fieldSelectOptions.areYouAnointed}
-                placeholder="Select"
+                placeholder="Select yes or no"
               />
               {errors.areYouAnointed?.message && (
                 <p className="text-sm text-red-600">{String(errors.areYouAnointed.message)}</p>
@@ -166,52 +217,50 @@ export function SpiritualDetailsForm({ initialData, onSubmit, isSubmitting = fal
             <Label>Church Address *</Label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="churchStreet">Street</Label>
+                <Label htmlFor="churchStreet">Street *</Label>
                 <Input
                   id="churchStreet"
                   value={churchAddress.street}
                   onChange={(e) => handleAddressChange('street', e.target.value)}
-                  placeholder="Church street address"
+                  placeholder="Street address"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="churchCity">City</Label>
+                <Label htmlFor="churchCity">City *</Label>
                 <Input
                   id="churchCity"
                   value={churchAddress.city}
                   onChange={(e) => handleAddressChange('city', e.target.value)}
-                  placeholder="Church city"
+                  placeholder="City"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="churchState">State</Label>
-                <select
-                  id="churchState"
+                <Label htmlFor="churchState">State *</Label>
+                <Select
                   value={churchAddress.state}
                   onChange={(e) => handleAddressChange('state', e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="">Select State</option>
-                  {fieldSelectOptions.state.map((state) => (
-                    <option key={state} value={state}>{state}</option>
-                  ))}
-                </select>
+                  options={fieldSelectOptions.state}
+                  placeholder="Select State"
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="churchPincode">Pincode</Label>
+                <Label htmlFor="churchPincode">Pincode *</Label>
                 <Input
                   id="churchPincode"
                   value={churchAddress.pincode}
                   onChange={(e) => handleAddressChange('pincode', e.target.value)}
-                  placeholder="Church pincode"
+                  placeholder="Pincode"
                 />
               </div>
             </div>
-            {errors.churchAddress?.message && (
-              <p className="text-sm text-red-600">{String(errors.churchAddress.message)}</p>
+            {errors.churchAddress && (
+              <p className="text-sm text-red-600">
+                Please fill all church address fields
+              </p>
             )}
           </div>
 
+          {/* Submit Button */}
           <div className="flex justify-end pt-6">
             <Button 
               type="submit" 

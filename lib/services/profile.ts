@@ -1,19 +1,13 @@
 import { prisma } from '@/lib/prisma'
-import { Profile, ProfileImage, FieldUpdate } from '@prisma/client'
-import { ProfileSectionKey, TEXT_FIELDS_REQUIRING_VERIFICATION } from '@/lib/profile-config'
+import { Profile, ProfileImage } from '@prisma/client'
+import { ProfileSectionKey } from '@/lib/profile-config'
 
 export interface CreateProfileData {
   userId: string
 }
 
 export interface UpdateProfileSectionData {
-  [key: string]: any
-}
-
-export interface CreateFieldUpdateData {
-  userId: string
-  fieldName: string
-  fieldValue: string
+  [key: string]: unknown
 }
 
 export interface CreateProfileImageData {
@@ -21,6 +15,14 @@ export interface CreateProfileImageData {
   data: string
   isPrimary?: boolean
   order?: number
+}
+
+export interface PhotoItem {
+  data: string
+  dimensions?: {
+    width: number
+    height: number
+  }
 }
 
 export class ProfileService {
@@ -39,33 +41,11 @@ export class ProfileService {
   /**
    * Get profile by user ID with images
    */
-  static async getProfileByUserId(userId: string, includeUnverifiedUpdates = false): Promise<Profile & { images: ProfileImage[] } | null> {
+  static async getProfileByUserId(userId: string): Promise<Profile & { images: ProfileImage[] } | null> {
     const profile = await prisma.profile.findUnique({
       where: { userId },
       include: { images: true },
     })
-
-    if (!profile) return null
-
-    // If requesting own profile, merge unverified field updates
-    if (includeUnverifiedUpdates) {
-      const fieldUpdates = await prisma.fieldUpdate.findMany({
-        where: { 
-          userId,
-          isApproved: false 
-        },
-      })
-
-      // Merge field updates into profile data
-      const updatedProfile = { ...profile }
-      fieldUpdates.forEach(update => {
-        if (TEXT_FIELDS_REQUIRING_VERIFICATION.includes(update.fieldName)) {
-          (updatedProfile as any)[update.fieldName] = update.fieldValue
-        }
-      })
-
-      return updatedProfile
-    }
 
     return profile
   }
@@ -78,61 +58,46 @@ export class ProfileService {
     section: ProfileSectionKey, 
     data: UpdateProfileSectionData
   ): Promise<Profile> {
-    // Separate text fields that require verification from regular fields
-    const regularFields: any = {}
-    const textFields: any = {}
+    // Fields that are relations and should not be included in direct profile updates
+    const RELATION_FIELDS = ['images', 'gallery']
+    
+    // Prepare profile update data
+    const profileUpdateData: Record<string, unknown> = {}
 
     Object.entries(data).forEach(([key, value]) => {
-      if (TEXT_FIELDS_REQUIRING_VERIFICATION.includes(key)) {
-        textFields[key] = value
-      } else {
-        regularFields[key] = value
+      // Skip relation fields - they need special handling
+      if (RELATION_FIELDS.includes(key)) {
+        return
       }
+      
+      // All fields can now be updated directly
+      profileUpdateData[key] = value
     })
 
-    // Update regular fields directly in profile
-    let profile = await prisma.profile.update({
-      where: { userId },
-      data: regularFields,
-    })
+    console.log('Profile update data:', JSON.stringify(profileUpdateData, null, 2))
 
-    // Handle text fields that require verification
-    for (const [fieldName, fieldValue] of Object.entries(textFields)) {
-      await this.createOrUpdateFieldUpdate(userId, fieldName, String(fieldValue))
-    }
-
-    return profile
-  }
-
-  /**
-   * Create or update a field update
-   */
-  static async createOrUpdateFieldUpdate(
-    userId: string, 
-    fieldName: string, 
-    fieldValue: string
-  ): Promise<FieldUpdate> {
-    const existingUpdate = await prisma.fieldUpdate.findFirst({
-      where: { 
-        userId,
-        fieldName,
-        isApproved: false 
-      },
-    })
-
-    if (existingUpdate) {
-      return await prisma.fieldUpdate.update({
-        where: { id: existingUpdate.id },
-        data: { fieldValue },
+    try {
+      // Update all fields directly in profile
+      const profile = await prisma.profile.update({
+        where: { userId },
+        data: profileUpdateData,
       })
-    } else {
-      return await prisma.fieldUpdate.create({
-        data: {
-          userId,
-          fieldName,
-          fieldValue,
-        },
-      })
+
+      // Handle images section separately
+      if (section === 'images' && data.gallery && Array.isArray(data.gallery)) {
+        await this.updateProfileImages(profile.id, (data.gallery as PhotoItem[]).map((item, index) => ({
+          profileId: profile.id,
+          data: item.data,
+          isPrimary: index === 0, // First image is always primary for now
+          order: index,
+        })))
+      }
+
+      return profile
+    } catch (error) {
+      console.error('Profile update error:', error)
+      console.error('Update data that caused error:', profileUpdateData)
+      throw error
     }
   }
 
@@ -150,8 +115,8 @@ export class ProfileService {
     const requiredFields = [
       'profileCreatedFor', 'name', 'gender', 'dateOfBirth', 'martialStatus', 'education', 'jobType', 
       'jobTitle', 'income', 'height', 'weight', 'complexion', 'mobileNumber',
-      'currentAddress', 'nativePlace', 'motherTongue', 'fatherName', 'fatherOccupation',
-      'motherName', 'motherOccupation', 'familyType', 'areYouSaved', 'areYouBaptized',
+      'nativePlace', 'motherTongue', 'fatherName', 'fatherOccupation',
+      'motherName', 'motherOccupation', 'familyType', 'currentAddress', 'areYouSaved', 'areYouBaptized',
       'areYouAnointed', 'churchName', 'denomination', 'pastorName', 'pastorMobileNumber',
       'churchAddress', 'exMinAge', 'exMaxAge', 'exEducation', 'exJobType', 'exIncome',
       'exComplexion'
@@ -159,7 +124,8 @@ export class ProfileService {
 
     let completedFields = 0
     requiredFields.forEach(field => {
-      if ((profile as any)[field]) {
+      const value = (profile as Record<string, unknown>)[field]
+      if (value !== null && value !== undefined && value !== '') {
         completedFields++
       }
     })
@@ -183,24 +149,42 @@ export class ProfileService {
 
     if (!profile) return 'personal'
 
+    const profileData = profile as Record<string, unknown>
+
     // Check personal section
-    const personalFields = ['profileCreatedFor', 'name', 'gender', 'dateOfBirth', 'martialStatus', 'education', 'jobType', 'jobTitle', 'income', 'height', 'weight', 'complexion', 'mobileNumber', 'currentAddress', 'nativePlace', 'motherTongue']
-    const personalComplete = personalFields.every(field => (profile as any)[field])
+    const personalFields = ['profileCreatedFor', 'name', 'gender', 'dateOfBirth', 'martialStatus', 'education', 'jobType', 'jobTitle', 'income', 'height', 'weight', 'complexion', 'mobileNumber', 'nativePlace', 'motherTongue']
+    const personalComplete = personalFields.every(field => {
+      const value = profileData[field]
+      return value !== null && value !== undefined && value !== ''
+    })
+    
     if (!personalComplete) return 'personal'
 
     // Check family section
-    const familyFields = ['fatherName', 'fatherOccupation', 'motherName', 'motherOccupation', 'familyType', 'youngerBrothers', 'youngerSisters', 'elderBrothers', 'elderSisters', 'youngerBrothersMarried', 'youngerSistersMarried', 'elderBrothersMarried', 'elderSistersMarried']
-    const familyComplete = familyFields.every(field => (profile as any)[field] !== null && (profile as any)[field] !== undefined)
+    const familyFields = ['fatherName', 'fatherOccupation', 'motherName', 'motherOccupation', 'familyType', 'currentAddress', 'youngerBrothers', 'youngerSisters', 'elderBrothers', 'elderSisters', 'youngerBrothersMarried', 'youngerSistersMarried', 'elderBrothersMarried', 'elderSistersMarried']
+    const familyComplete = familyFields.every(field => {
+      const value = profileData[field]
+      return value !== null && value !== undefined && value !== ''
+    })
+    
     if (!familyComplete) return 'family'
 
     // Check spiritual section
     const spiritualFields = ['areYouSaved', 'areYouBaptized', 'areYouAnointed', 'churchName', 'denomination', 'pastorName', 'pastorMobileNumber', 'churchAddress']
-    const spiritualComplete = spiritualFields.every(field => (profile as any)[field])
+    const spiritualComplete = spiritualFields.every(field => {
+      const value = profileData[field]
+      return value !== null && value !== undefined && value !== ''
+    })
+    
     if (!spiritualComplete) return 'spiritual'
 
     // Check preferences section
     const preferencesFields = ['exMinAge', 'exMaxAge', 'exEducation', 'exJobType', 'exIncome', 'exComplexion']
-    const preferencesComplete = preferencesFields.every(field => (profile as any)[field])
+    const preferencesComplete = preferencesFields.every(field => {
+      const value = profileData[field]
+      return value !== null && value !== undefined && value !== ''
+    })
+    
     if (!preferencesComplete) return 'preferences'
 
     // Check images section
@@ -285,54 +269,6 @@ export class ProfileService {
     return await prisma.profileImage.update({
       where: { id: imageId },
       data: { isPrimary: true },
-    })
-  }
-
-  /**
-   * Admin operations for field updates
-   */
-  static async approveFieldUpdate(updateId: string): Promise<void> {
-    const fieldUpdate = await prisma.fieldUpdate.findUnique({
-      where: { id: updateId },
-    })
-
-    if (!fieldUpdate) {
-      throw new Error('Field update not found')
-    }
-
-    // Update the profile with the approved value
-    await prisma.profile.update({
-      where: { userId: fieldUpdate.userId },
-      data: {
-        [fieldUpdate.fieldName]: fieldUpdate.fieldValue,
-      },
-    })
-
-    // Mark the field update as approved
-    await prisma.fieldUpdate.update({
-      where: { id: updateId },
-      data: { isApproved: true },
-    })
-  }
-
-  static async rejectFieldUpdate(updateId: string): Promise<void> {
-    await prisma.fieldUpdate.delete({
-      where: { id: updateId },
-    })
-  }
-
-  static async getPendingFieldUpdates(): Promise<FieldUpdate[]> {
-    return await prisma.fieldUpdate.findMany({
-      where: { isApproved: false },
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
     })
   }
 } 

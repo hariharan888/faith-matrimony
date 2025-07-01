@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { Button } from '@/components/ui/button'
@@ -9,59 +9,108 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { profileSections, fieldSelectOptions } from '@/lib/profile-config'
+import { AddressData, FormSubmissionHandler } from '@/types/my-profile'
 
 interface FamilyDetailsFormProps {
-  initialData?: any
-  onSubmit: (data: any) => Promise<void>
+  initialData?: Record<string, unknown>
+  onSubmit: FormSubmissionHandler
   isSubmitting?: boolean
 }
 
 export function FamilyDetailsForm({ initialData, onSubmit, isSubmitting = false }: FamilyDetailsFormProps) {
-  const [currentAddress, setCurrentAddress] = useState({
-    street: '',
-    city: '',
-    state: '',
-    pincode: ''
-  })
+  // Function to sanitize initial data by converting null values to appropriate defaults
+  const sanitizeInitialData = useMemo(() => {
+    if (!initialData) return {}
+    
+    const sanitized: Record<string, unknown> = {}
+    
+    Object.entries(initialData).forEach(([key, value]) => {
+      if (value === null) {
+        // Convert null values to appropriate defaults
+        if (key.includes('Brothers') || key.includes('Sisters')) {
+          sanitized[key] = 0 // Number fields default to 0
+        } else {
+          sanitized[key] = '' // String fields default to empty string
+        }
+      } else {
+        sanitized[key] = value
+      }
+    })
+    
+    return sanitized
+  }, [initialData])
+
+  // Initialize currentAddress from initialData or empty
+  const initialAddress = useMemo((): AddressData => {
+    if (sanitizeInitialData?.currentAddress && typeof sanitizeInitialData.currentAddress === 'object') {
+      const addr = sanitizeInitialData.currentAddress as AddressData
+      return {
+        street: addr.street || '',
+        city: addr.city || '',
+        state: addr.state || '',
+        pincode: addr.pincode || ''
+      }
+    }
+    return {
+      street: '',
+      city: '',
+      state: '',
+      pincode: ''
+    }
+  }, [sanitizeInitialData])
+
+  const [currentAddress, setCurrentAddress] = useState<AddressData>(initialAddress)
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-    reset,
-    watch,
-    setValue
+    reset
   } = useForm({
-    resolver: yupResolver(profileSections.family.validationSchema),
-    defaultValues: initialData || {}
+    resolver: yupResolver(profileSections.family.validationSchema)
   })
 
   useEffect(() => {
-    if (initialData) {
-      reset(initialData)
-      if (initialData.currentAddress) {
-        setCurrentAddress(initialData.currentAddress)
+    if (sanitizeInitialData && Object.keys(sanitizeInitialData).length > 0) {
+      const newAddress = initialAddress
+      setCurrentAddress(newAddress)
+      
+      // Only reset if we have meaningful data
+      const formData = {
+        ...sanitizeInitialData,
+        currentAddress: newAddress
       }
+      
+      reset(formData)
     }
-  }, [initialData, reset])
+  }, [sanitizeInitialData, initialAddress, reset])
 
-  const handleAddressChange = (field: string, value: string) => {
+  const handleAddressChange = (field: keyof AddressData, value: string) => {
     const newAddress = { ...currentAddress, [field]: value }
     setCurrentAddress(newAddress)
-    setValue('currentAddress', newAddress)
   }
 
-  // Watch sibling counts to validate married counts
-  const youngerBrothers = watch('youngerBrothers') || 0
-  const youngerSisters = watch('youngerSisters') || 0
-  const elderBrothers = watch('elderBrothers') || 0
-  const elderSisters = watch('elderSisters') || 0
-
-  const onFormSubmit = async (data: any) => {
+  const onFormSubmit = async (data: Record<string, unknown>) => {
     try {
-      await onSubmit({ ...data, currentAddress })
+      // Only send the family section fields
+      const familyFields = profileSections.family.fields
+      const filteredData: Record<string, unknown> = {}
+      familyFields.forEach(field => {
+        if (data[field] !== undefined) {
+          // Convert integer fields to integers
+          if (field.includes('Brothers') || field.includes('Sisters')) {
+            filteredData[field] = parseInt(data[field] as string, 10) || 0
+          } else {
+            filteredData[field] = data[field]
+          }
+        }
+      })
+      filteredData.currentAddress = currentAddress
+      await onSubmit(filteredData)
     } catch (error) {
       console.error('Form submission error:', error)
+      // Error will be handled by the parent component with toast
+      throw error
     }
   }
 
@@ -70,61 +119,60 @@ export function FamilyDetailsForm({ initialData, onSubmit, isSubmitting = false 
       <CardHeader>
         <CardTitle>Family Details</CardTitle>
         <CardDescription>
-          Family background information
+          Information about your family background
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
-          {/* Father Details */}
+          {/* Parent Details - 2 columns */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="fatherName">Father's Name *</Label>
+              <Label htmlFor="fatherName">Father&apos;s Name *</Label>
               <Input
                 id="fatherName"
                 {...register('fatherName')}
                 placeholder="Enter father's name"
               />
-              {errors.fatherName && (
-                <p className="text-sm text-red-600">{errors.fatherName.message}</p>
+              {errors.fatherName?.message && (
+                <p className="text-sm text-red-600">{String(errors.fatherName.message)}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="fatherOccupation">Father's Occupation *</Label>
-              <Select
+              <Label htmlFor="fatherOccupation">Father&apos;s Occupation *</Label>
+              <Input
+                id="fatherOccupation"
                 {...register('fatherOccupation')}
-                options={fieldSelectOptions.fatherOccupation}
-                placeholder="Select father's occupation"
+                placeholder="Enter father's occupation"
               />
-              {errors.fatherOccupation && (
-                <p className="text-sm text-red-600">{errors.fatherOccupation.message}</p>
+              {errors.fatherOccupation?.message && (
+                <p className="text-sm text-red-600">{String(errors.fatherOccupation.message)}</p>
               )}
             </div>
           </div>
 
-          {/* Mother Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="motherName">Mother's Name *</Label>
+              <Label htmlFor="motherName">Mother&apos;s Name *</Label>
               <Input
                 id="motherName"
                 {...register('motherName')}
                 placeholder="Enter mother's name"
               />
-              {errors.motherName && (
-                <p className="text-sm text-red-600">{errors.motherName.message}</p>
+              {errors.motherName?.message && (
+                <p className="text-sm text-red-600">{String(errors.motherName.message)}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="motherOccupation">Mother's Occupation *</Label>
-              <Select
+              <Label htmlFor="motherOccupation">Mother&apos;s Occupation *</Label>
+              <Input
+                id="motherOccupation"
                 {...register('motherOccupation')}
-                options={fieldSelectOptions.motherOccupation}
-                placeholder="Select mother's occupation"
+                placeholder="Enter mother's occupation"
               />
-              {errors.motherOccupation && (
-                <p className="text-sm text-red-600">{errors.motherOccupation.message}</p>
+              {errors.motherOccupation?.message && (
+                <p className="text-sm text-red-600">{String(errors.motherOccupation.message)}</p>
               )}
             </div>
           </div>
@@ -137,8 +185,8 @@ export function FamilyDetailsForm({ initialData, onSubmit, isSubmitting = false 
               options={fieldSelectOptions.familyType}
               placeholder="Select family type"
             />
-            {errors.familyType && (
-              <p className="text-sm text-red-600">{errors.familyType.message}</p>
+            {errors.familyType?.message && (
+              <p className="text-sm text-red-600">{String(errors.familyType.message)}</p>
             )}
           </div>
 
@@ -147,7 +195,7 @@ export function FamilyDetailsForm({ initialData, onSubmit, isSubmitting = false 
             <Label>Current Address *</Label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="street">Street</Label>
+                <Label htmlFor="street">Street *</Label>
                 <Input
                   id="street"
                   value={currentAddress.street}
@@ -156,7 +204,7 @@ export function FamilyDetailsForm({ initialData, onSubmit, isSubmitting = false 
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="city">City</Label>
+                <Label htmlFor="city">City *</Label>
                 <Input
                   id="city"
                   value={currentAddress.city}
@@ -165,21 +213,16 @@ export function FamilyDetailsForm({ initialData, onSubmit, isSubmitting = false 
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="state">State</Label>
-                <select
-                  id="state"
+                <Label htmlFor="state">State *</Label>
+                <Select
                   value={currentAddress.state}
                   onChange={(e) => handleAddressChange('state', e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="">Select State</option>
-                  {fieldSelectOptions.state.map((state) => (
-                    <option key={state} value={state}>{state}</option>
-                  ))}
-                </select>
+                  options={fieldSelectOptions.state}
+                  placeholder="Select State"
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="pincode">Pincode</Label>
+                <Label htmlFor="pincode">Pincode *</Label>
                 <Input
                   id="pincode"
                   value={currentAddress.pincode}
@@ -188,137 +231,132 @@ export function FamilyDetailsForm({ initialData, onSubmit, isSubmitting = false 
                 />
               </div>
             </div>
-            {errors.currentAddress?.message && (
-              <p className="text-sm text-red-600">{String(errors.currentAddress.message)}</p>
+            {errors.currentAddress && (
+              <p className="text-sm text-red-600">
+                Please fill all address fields
+              </p>
             )}
           </div>
 
-          {/* Siblings Information */}
-          <div className="space-y-6">
-            <h3 className="text-lg font-medium">Siblings Information</h3>
-            
-            {/* Total Siblings */}
+          {/* Sibling Details - 4 columns */}
+          <div className="space-y-4">
+            <Label>Sibling Details</Label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="youngerBrothers">Younger Brothers *</Label>
+                <Label htmlFor="youngerBrothers">Younger Brothers</Label>
                 <Input
                   id="youngerBrothers"
                   type="number"
                   min="0"
-                  max="20"
                   {...register('youngerBrothers', { valueAsNumber: true })}
                   placeholder="0"
                 />
-                {errors.youngerBrothers && (
-                  <p className="text-sm text-red-600">{errors.youngerBrothers.message}</p>
+                {errors.youngerBrothers?.message && (
+                  <p className="text-sm text-red-600">{String(errors.youngerBrothers.message)}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="youngerSisters">Younger Sisters *</Label>
+                <Label htmlFor="youngerSisters">Younger Sisters</Label>
                 <Input
                   id="youngerSisters"
                   type="number"
                   min="0"
-                  max="20"
                   {...register('youngerSisters', { valueAsNumber: true })}
                   placeholder="0"
                 />
-                {errors.youngerSisters && (
-                  <p className="text-sm text-red-600">{errors.youngerSisters.message}</p>
+                {errors.youngerSisters?.message && (
+                  <p className="text-sm text-red-600">{String(errors.youngerSisters.message)}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="elderBrothers">Elder Brothers *</Label>
+                <Label htmlFor="elderBrothers">Elder Brothers</Label>
                 <Input
                   id="elderBrothers"
                   type="number"
                   min="0"
-                  max="20"
                   {...register('elderBrothers', { valueAsNumber: true })}
                   placeholder="0"
                 />
-                {errors.elderBrothers && (
-                  <p className="text-sm text-red-600">{errors.elderBrothers.message}</p>
+                {errors.elderBrothers?.message && (
+                  <p className="text-sm text-red-600">{String(errors.elderBrothers.message)}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="elderSisters">Elder Sisters *</Label>
+                <Label htmlFor="elderSisters">Elder Sisters</Label>
                 <Input
                   id="elderSisters"
                   type="number"
                   min="0"
-                  max="20"
                   {...register('elderSisters', { valueAsNumber: true })}
                   placeholder="0"
                 />
-                {errors.elderSisters && (
-                  <p className="text-sm text-red-600">{errors.elderSisters.message}</p>
+                {errors.elderSisters?.message && (
+                  <p className="text-sm text-red-600">{String(errors.elderSisters.message)}</p>
                 )}
               </div>
             </div>
+          </div>
 
-            {/* Married Siblings */}
+          {/* Married Sibling Details - 4 columns */}
+          <div className="space-y-4">
+            <Label>Married Sibling Details</Label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="youngerBrothersMarried">Younger Brothers Married *</Label>
+                <Label htmlFor="youngerBrothersMarried">Younger Brothers Married</Label>
                 <Input
                   id="youngerBrothersMarried"
                   type="number"
                   min="0"
-                  max={youngerBrothers}
                   {...register('youngerBrothersMarried', { valueAsNumber: true })}
                   placeholder="0"
                 />
-                {errors.youngerBrothersMarried && (
-                  <p className="text-sm text-red-600">{errors.youngerBrothersMarried.message}</p>
+                {errors.youngerBrothersMarried?.message && (
+                  <p className="text-sm text-red-600">{String(errors.youngerBrothersMarried.message)}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="youngerSistersMarried">Younger Sisters Married *</Label>
+                <Label htmlFor="youngerSistersMarried">Younger Sisters Married</Label>
                 <Input
                   id="youngerSistersMarried"
                   type="number"
                   min="0"
-                  max={youngerSisters}
                   {...register('youngerSistersMarried', { valueAsNumber: true })}
                   placeholder="0"
                 />
-                {errors.youngerSistersMarried && (
-                  <p className="text-sm text-red-600">{errors.youngerSistersMarried.message}</p>
+                {errors.youngerSistersMarried?.message && (
+                  <p className="text-sm text-red-600">{String(errors.youngerSistersMarried.message)}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="elderBrothersMarried">Elder Brothers Married *</Label>
+                <Label htmlFor="elderBrothersMarried">Elder Brothers Married</Label>
                 <Input
                   id="elderBrothersMarried"
                   type="number"
                   min="0"
-                  max={elderBrothers}
                   {...register('elderBrothersMarried', { valueAsNumber: true })}
                   placeholder="0"
                 />
-                {errors.elderBrothersMarried && (
-                  <p className="text-sm text-red-600">{errors.elderBrothersMarried.message}</p>
+                {errors.elderBrothersMarried?.message && (
+                  <p className="text-sm text-red-600">{String(errors.elderBrothersMarried.message)}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="elderSistersMarried">Elder Sisters Married *</Label>
+                <Label htmlFor="elderSistersMarried">Elder Sisters Married</Label>
                 <Input
                   id="elderSistersMarried"
                   type="number"
                   min="0"
-                  max={elderSisters}
                   {...register('elderSistersMarried', { valueAsNumber: true })}
                   placeholder="0"
                 />
-                {errors.elderSistersMarried && (
-                  <p className="text-sm text-red-600">{errors.elderSistersMarried.message}</p>
+                {errors.elderSistersMarried?.message && (
+                  <p className="text-sm text-red-600">{String(errors.elderSistersMarried.message)}</p>
                 )}
               </div>
             </div>
